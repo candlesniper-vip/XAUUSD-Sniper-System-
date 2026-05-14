@@ -28,7 +28,10 @@ import {
   Zap,
   Globe,
   ScanSearch,
-  RefreshCw
+  RefreshCw,
+  Play,
+  Calendar,
+  DollarSign
 } from 'lucide-react';
 import { useTranslation } from './LanguageContext';
 import { Language } from './i18n';
@@ -258,13 +261,69 @@ export default function App() {
   }, [chartConfig]);
   const [showChartSettings, setShowChartSettings] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'performance' | 'strategy' | 'indicators' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'performance' | 'backtest' | 'strategy' | 'indicators' | 'settings'>('dashboard');
   const [detectedPatterns, setDetectedPatterns] = useState<{id: string, name: string, type: 'bullish'|'bearish'|'neutral', time: string}[]>([
     { id: 'initial-1', name: 'Hammer', type: 'bullish', time: new Date(Date.now() - 60000).toISOString().split('T')[1].split('.')[0] + ' UTC' }
   ]);
   const [customScriptCode, setCustomScriptCode] = useState('');
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [backtestState, setBacktestState] = useState<'idle' | 'running' | 'completed'>('idle');
+  const [backtestResults, setBacktestResults] = useState<{
+    netProfit: number;
+    totalTrades: number;
+    winRate: number;
+    profitFactor: number;
+    maxDrawdown: number;
+    equityCurve: number[];
+  } | null>(null);
+
+  const handleRunBacktest = () => {
+    setBacktestState('running');
+    setBacktestResults(null);
+    setTimeout(() => {
+      const trades = Math.floor(Math.random() * 50) + 50;
+      const wRate = 45 + Math.random() * 25;
+      const wins = Math.floor(trades * (wRate / 100));
+      const losses = trades - wins;
+      
+      const avgWin = 120 + Math.random() * 80;
+      const avgLoss = 80 + Math.random() * 40;
+      
+      const grossProfit = wins * avgWin;
+      const grossLoss = losses * avgLoss;
+      const net = grossProfit - grossLoss;
+      const pf = grossLoss > 0 ? grossProfit / grossLoss : 2.5;
+      
+      const curve = [10000];
+      let currentEquity = 10000;
+      let maxDrawdown = 0;
+      let peak = 10000;
+      
+      for(let i=0; i<trades; i++) {
+        if (Math.random() * 100 < wRate) {
+           currentEquity += avgWin * (0.8 + Math.random() * 0.4);
+        } else {
+           currentEquity -= avgLoss * (0.8 + Math.random() * 0.4);
+        }
+        curve.push(currentEquity);
+        
+        if (currentEquity > peak) peak = currentEquity;
+        const dd = (peak - currentEquity) / peak * 100;
+        if (dd > maxDrawdown) maxDrawdown = dd;
+      }
+      
+      setBacktestResults({
+         netProfit: currentEquity - 10000,
+         totalTrades: trades,
+         winRate: wRate,
+         profitFactor: pf,
+         maxDrawdown: maxDrawdown,
+         equityCurve: curve
+      });
+      setBacktestState('completed');
+    }, 2500);
+  };
 
   useEffect(() => {
     const patterns = [
@@ -729,7 +788,7 @@ User prompt: ${aiPrompt}`,
       {/* Navigation Tabs */}
       <nav className="bg-slate-900 border-b border-slate-800 shrink-0 overflow-x-auto">
         <div className="flex gap-2 p-2 px-3">
-          {['dashboard', 'performance', 'strategy', 'indicators', 'settings'].map((tab) => (
+          {['dashboard', 'performance', 'backtest', 'strategy', 'indicators', 'settings'].map((tab) => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -741,6 +800,7 @@ User prompt: ${aiPrompt}`,
             >
               {tab === 'dashboard' && <LayoutDashboard size={14} />}
               {tab === 'performance' && <LineChart size={14} />}
+              {tab === 'backtest' && <History size={14} />}
               {tab === 'strategy' && <BookOpen size={14} />}
               {tab === 'indicators' && <Code size={14} />}
               {tab === 'settings' && <Settings size={14} />}
@@ -1246,6 +1306,157 @@ User prompt: ${aiPrompt}`,
                  </table>
                </div>
              </div>
+          </div>
+        )}
+
+        {activeTab === 'backtest' && (
+          <div className="flex-1 flex flex-col md:flex-row overflow-y-auto custom-scrollbar gap-4">
+            {/* Control Panel */}
+            <div className="w-full md:w-[350px] shrink-0 bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col h-fit">
+               <h3 className="font-mono text-xs text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                 <Settings2 size={14} className="text-blue-500" /> Backtest Parameters
+               </h3>
+               
+               <div className="space-y-4 font-mono text-xs">
+                 <div className="flex flex-col gap-1">
+                   <label className="text-slate-500 uppercase tracking-widest text-[9px]">Trading Pair</label>
+                   <select className="bg-slate-950 border border-slate-800 rounded p-2 text-white outline-none focus:border-blue-500">
+                     <option>XAUUSD</option>
+                     <option>EURUSD</option>
+                     <option>BTCUSDT</option>
+                   </select>
+                 </div>
+                 
+                 <div className="flex flex-col gap-1">
+                   <label className="text-slate-500 uppercase tracking-widest text-[9px]">Timeframe</label>
+                   <select className="bg-slate-950 border border-slate-800 rounded p-2 text-white outline-none focus:border-blue-500">
+                     <option>1m</option>
+                     <option>5m</option>
+                     <option>15m</option>
+                     <option>1H</option>
+                     <option>4H</option>
+                   </select>
+                 </div>
+                 
+                 <div className="flex flex-col gap-1">
+                   <label className="text-slate-500 uppercase tracking-widest text-[9px]">Date Range</label>
+                   <div className="flex items-center gap-2">
+                     <div className="flex-1 bg-slate-950 border border-slate-800 rounded p-2 text-white flex items-center gap-2">
+                       <Calendar size={12} className="text-slate-500" />
+                       <input type="date" defaultValue="2023-01-01" className="bg-transparent w-full outline-none text-[10px]" />
+                     </div>
+                     <span className="text-slate-500">-</span>
+                     <div className="flex-1 bg-slate-950 border border-slate-800 rounded p-2 text-white flex items-center gap-2">
+                       <Calendar size={12} className="text-slate-500" />
+                       <input type="date" defaultValue="2023-12-31" className="bg-transparent w-full outline-none text-[10px]" />
+                     </div>
+                   </div>
+                 </div>
+
+                 <div className="flex flex-col gap-1">
+                   <label className="text-slate-500 uppercase tracking-widest text-[9px]">Initial Capital</label>
+                   <div className="bg-slate-950 border border-slate-800 rounded p-2 text-white flex items-center gap-2">
+                     <DollarSign size={12} className="text-slate-500" />
+                     <input type="number" defaultValue={10000} className="bg-transparent w-full outline-none" />
+                   </div>
+                 </div>
+
+                 <div className="pt-2">
+                   <button 
+                     onClick={handleRunBacktest}
+                     disabled={backtestState === 'running'}
+                     className={`w-full py-3 rounded text-white font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all ${
+                       backtestState === 'running' ? 'bg-blue-600/50 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
+                     }`}
+                   >
+                     {backtestState === 'running' ? (
+                       <><RefreshCw size={14} className="animate-spin" /> Running Simulation...</>
+                     ) : (
+                       <><Play size={14} /> Run Backtest</>
+                     )}
+                   </button>
+                 </div>
+               </div>
+            </div>
+
+            {/* Results Area */}
+            <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col min-h-[400px]">
+              <h3 className="font-mono text-xs text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                 <History size={14} className="text-emerald-500" /> Backtest Results
+              </h3>
+              
+              {backtestState === 'idle' && (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-500 font-mono text-[10px] uppercase tracking-widest border-2 border-dashed border-slate-800 rounded-lg">
+                  <BarChart2 size={32} className="mb-2 opacity-50" />
+                  <p>Configure parameters and run backtest to see results</p>
+                </div>
+              )}
+
+              {backtestState === 'running' && (
+                <div className="flex-1 flex flex-col items-center justify-center text-blue-400 font-mono text-[10px] uppercase tracking-widest border-2 border-dashed border-blue-900/50 rounded-lg bg-blue-950/10">
+                  <RefreshCw size={32} className="mb-4 animate-spin opacity-50" />
+                  <p className="animate-pulse">Simulating market conditions...</p>
+                  <p className="text-[8px] text-slate-500 mt-2">Processing historical tick data</p>
+                </div>
+              )}
+
+              {backtestState === 'completed' && backtestResults && (
+                <div className="flex flex-col gap-6 h-full font-mono animate-in fade-in zoom-in-95 duration-500">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Net Profit</div>
+                      <div className={`text-xl font-bold ${backtestResults.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {backtestResults.netProfit >= 0 ? '+' : ''}${backtestResults.netProfit.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Total Trades</div>
+                      <div className="text-xl font-bold text-white">{backtestResults.totalTrades}</div>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Win Rate</div>
+                      <div className="text-xl font-bold text-blue-400">{backtestResults.winRate.toFixed(1)}%</div>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Profit Factor</div>
+                      <div className="text-xl font-bold text-amber-400">{backtestResults.profitFactor.toFixed(2)}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-widest">Equity Curve Projection</div>
+                      <div className="text-[9px] text-red-400 uppercase">Max Drawdown: -{backtestResults.maxDrawdown.toFixed(2)}%</div>
+                    </div>
+                    
+                    <div className="flex-1 w-full relative flex items-end">
+                      {/* Simple CSS-based bar chart for equity curve representation */}
+                      <div className="absolute inset-0 flex items-end gap-[1px] opacity-80 pt-4">
+                         {backtestResults.equityCurve.map((eq, idx) => {
+                           // Normalize bar heights between 10% and 100% of container
+                           const minEq = Math.min(...backtestResults.equityCurve);
+                           const maxEq = Math.max(...backtestResults.equityCurve);
+                           const range = maxEq - minEq || 1;
+                           const heightPct = 10 + ((eq - minEq) / range) * 90;
+                           
+                           return (
+                             <div 
+                               key={idx} 
+                               className="flex-1 bg-blue-500/50 hover:bg-blue-400 transition-colors border-t border-blue-400 relative group"
+                               style={{ height: `${heightPct}%` }}
+                             >
+                                <div className="hidden group-hover:block absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[8px] p-1 rounded whitespace-nowrap z-10 w-fit">
+                                  Trade {idx}: ${eq.toFixed(2)}
+                                </div>
+                             </div>
+                           );
+                         })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -4,6 +4,7 @@ export const translations = {
   en: {
     dashboard: "Dashboard",
     performance: "Performance",
+    backtest: "Backtest",
     strategy: "Strategy",
     indicators: "Indicators",
     settings: "Settings",
@@ -64,6 +65,7 @@ export const translations = {
   om: {
     dashboard: "Gabatee",
     performance: "Raawwii",
+    backtest: "Backtest",
     strategy: "Tarsiimoo",
     indicators: "Mallattoolee",
     settings: "Sajoo",
